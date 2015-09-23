@@ -2,7 +2,8 @@ const ValidMods = Union{Function, NTuple{2, Int}, Number, Void}
 const ValidVars = Union{Symbol, Vector, Matrix}
 
 function plot{T <: MatStatus}(x::ValidVars, y::ValidVars, mss::Vector{T};
-                               x_mod::ValidMods = nothing, y_mod::ValidMods = nothing)
+                              x_mod::ValidMods = nothing,
+                              y_mod::ValidMods = nothing)
     plot!(plot(), x, y, mss; x_mod=x_mod, y_mod=y_mod)
 end
 
@@ -26,9 +27,9 @@ function plot!{T <: MatStatus}(p::Plots.Plot, x::ValidVars, y::ValidVars, mss::V
                                     (ys, y, y_mod))
             if isa(val, Symbol)
                 res_vec[i] = get_value(ms.(val), mod)
-            elseif isa(x, Vector)
+            elseif isa(val, Vector)
                 res_vec[i] = get_value(val[i], mod)
-            elseif isa(x, Matrix)
+            elseif isa(val, Matrix)
                 res_vec[i] = get_value(val[:,i], mod)
             end
         end
