@@ -3,6 +3,8 @@
 `ConstLab.jl` is a small package for Julia to test and experiment with constitutive models.
 It's main functionality is to call a user given material routine over a time range, aggregate the material response and return it back for analysis. The load applied to the material can be user generated or one of the predefined load cases can be used. To facilitate visualizing the results, some auxiliary plot functions are provided.
 
+This code was inspired by a MATLAB script originally written by Magnus Ekh - Chalmers.
+
 ## Usage
 
 This README contains a short guide to using `ConstLab.jl`.
@@ -36,7 +38,7 @@ plastic strain and hardening. The result of running the simulation will contain 
 stress(ɛ::Vector, ∆t::Number, ms::MatStatus, mp::MatParameter)
     -> σ::Vector, ATS::Matrix, ms::MatStatus
 ```
-`ε` is the strain for the current time step, `∆t` is the time increment from the last time step, `ms` is the `MatStatus` from the previous timestep and `mp` is the `MatParameter` for the material.
+where `ε` is the strain for the current time step, `∆t` is the time increment from the last time step, `ms` is the `MatStatus` from the previous timestep and `mp` is the `MatParameter` for the material.
 
 The function should return `σ, ATS, ms` where `σ` is the new stress, `ATS` is the
 Algorithmic Tangent Stiffness (or an approximation of it), and `ms` is the updated `MatStatus`.
@@ -86,7 +88,7 @@ Output:
 * `matstats`: vector of the the material status in each time step
 
 
-#### Optional Solver parameters for `driver`.
+#### Optional solver parameters for `driver`.
 
 The package used to solve for the prescribed stresses is [NLSolve.jl](https://github.com/EconForge/NLsolve.jl). The following can be passed to `driver` as optional arguments to control the solver parameters:
 
@@ -107,7 +109,7 @@ maximum number of iterations. Default: `true`. Only used if `err_on_nonconv = fa
 
 ### Predefined load cases
 
-`ConstLab.jl` can help you create input data to `driver` for some common loadcases. The specification for the function `loadcase` is
+`ConstLab.jl` can help you create input data to `driver` for some common load cases. The specification for the function `loadcase` is
 
 ```julia
 loadcase(case, ε_max, ts) -> ε_history, σ_history, ε_control
@@ -157,14 +159,14 @@ Plotted like a normal vector
 
 #### Examples of plotting
 
-* Below, `n_ε_p` is a vector in matstats, `n_κ` is a scalar in matstats. We want to plot the first copmponent of n_ε_p against n_κ:
-```
-p = plot(:n_ε_p, :n_κ; matstats, mod_x = 1)
+* Below, `ε_p` is a vector in matstats, `κ` is a scalar in matstats. We want to plot the first component of `ε_p` against `κ`:
+    ```
+p = plot(:ε_p, :κ; matstats, mod_x = 1)
 ```
 
 * Below, `εs` and `σs` are the results from `driver`. `vm` is a function that computes the von Mises
 stress. We want to plot the first component of `εs` against the von Mises stress:
-```
+    ```
 p = plot(εs, σs, mod_x = 1, mod_y = vm)
 ```
 
