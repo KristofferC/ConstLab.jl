@@ -125,51 +125,6 @@ Allowed `case`'s (`11, 22, 33, 23, 13, 12`- Voigt notation assumed):
 * `:biaxial_strain_plstress`: enfore σ33 = 0, ε11 and ε22 varied.
 * `:simpleshear`: full strain control, ε12 varied.
 
-### Plotting
-
-It is of course possible to manually extract data from the vector of material statuses
-that `driver` returns and plot these with whatever plotting package that is desired.
-This can however be cumbersome so `ConstLab.jl` therefore extends the `plot` command so that it can
-directly take results that come from `driver`.
-
-`ConstLab.jl` uses the [Plots.jl](https://github.com/tbreloff/Plots.jl) package for plotting. This means that you are free to set the backend for the plots as described in the `Plots.jl` manual.
-
-The format for the extended plot command is `plot(x, y, matstats [; mod_x, mod_y])`.
-
-The variable `matstats` should be the vector of `MatStats` returned from `driver`. `x` and `y` can either be a `Symbol`, `Vector` or `Matrix`. `mod_x` and `mod_y` are optional variables that modify `x` and `y`.
-
-#### `x::Symbol`
-
-This will extract the field `x` from each material status. Depending on the type of the field extracted `mod_x` and `mod_y` can do different things.
-
-* `field::Number`: if no `mod_x` is given, the number is plotted, if `mod_x::Function` the function will be applied to the number and be plotted
-
-* `field::Vector`: if `mod_x` is an integer that component of the vector is plotted, if `mod_x::Function` the function will be applied to the vector and be plotted.
-
-* `field::Matrix`: if `mod_x` is an tuple of two integers, that index of the vector is plotted, if `  mod_x::Function` the function will be applied to the matrix and be plotted.
-
-#### `x::Matrix`
-
-* This will extract the column in `x` for the time step. The rules for `mod_x` then applies like for `field::Vector` above.
-
-#### `x::Vector`
-
-Plotted like a normal vector
-
-
-#### Examples of plotting
-
-* Below, `ε_p` is a vector in matstats, `κ` is a scalar in matstats. We want to plot the first component of `ε_p` against `κ`:
-    ```
-p = plot(:ε_p, :κ; matstats, mod_x = 1)
-```
-
-* Below, `εs` and `σs` are the results from `driver`. `vm` is a function that computes the von Mises
-stress. We want to plot the first component of `εs` against the von Mises stress:
-    ```
-p = plot(εs, σs, mod_x = 1, mod_y = vm)
-```
-
 ## Examples
 
 There are a few different examples in the `examples` directory. Note that some of the examples use more

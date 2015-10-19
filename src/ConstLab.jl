@@ -5,8 +5,8 @@ import Base.show
 using NLsolve
 using Plots
 
-import Plots: plot, plot!
-export loadcase, driver, MatStatus, MatParameter, plot, plot!
+#import Plots: plot, plot!
+export loadcase, driver, MatStatus, MatParameter #, plot, plot!
 
 const NON_CONV_MESSAGE = "constitutive iterations did not converge"
 
@@ -17,10 +17,8 @@ abstract MatStatus
 abstract MatParameter
 abstract MatModel
 
-function stress() end
-
 include("driver.jl")
-include("plotting.jl")
+#include("plotting.jl")
 include("loadcase.jl")
 
 end # module
