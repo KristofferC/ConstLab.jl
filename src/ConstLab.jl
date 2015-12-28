@@ -3,10 +3,8 @@ module ConstLab
 import Base.show
 
 using NLsolve
-using Plots
 
-#import Plots: plot, plot!
-export loadcase, driver, MatStatus, MatParameter #, plot, plot!
+export loadcase, driver, MatStatus, MatParameter, create_component_macro
 
 const NON_CONV_MESSAGE = "constitutive iterations did not converge"
 
@@ -18,7 +16,7 @@ abstract MatParameter
 abstract MatModel
 
 include("driver.jl")
-#include("plotting.jl")
 include("loadcase.jl")
+include("utils.jl")
 
 end # module

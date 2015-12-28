@@ -1,8 +1,10 @@
 """
 Constitutive driver.
 """
-function driver(matstat::MatStatus,
-                matpar::MatParameter,
+function driver(stress,
+                ats,
+                matstat,
+                matpar,
                 time_history::Vector,
                 strain_history::Matrix,
                 stress_history::Matrix,
@@ -31,31 +33,39 @@ function driver(matstat::MatStatus,
     εs = zeros(ɛ_dim, nt)
     σs = zeros(ɛ_dim, nt)
     ɛ_sol = zeros(sum(sc))
-
+    ms_grad = deepcopy(ms)
 
     i = 1
     t_prev = time_history[1]
+    ɛ_sol = zeros(sum(sc))
+    ∆εₙ₋₁ = zeros(sum(sc))
+    ∆ε₀ = zeros(sum(sc))
+    ∆ε = zeros(sum(sc))
     for (i, t) in enumerate(time_history[2:end])
         i += 1
         dt = t - t_prev
         ɛ = strain_history[:, i]
         σ = stress_history[:, i]
-
         # Guess total strain
-        ɛ_iter = copy(ɛ)
+        ms_new = deepcopy(ms)
+        if !(sum(sc) == 0)
+            copy!(∆ε₀, ∆εₙ₋₁)
 
-        # Full strain control -> correct strain is just the one from strain_history
-        if sum(sc) == 0
-            ɛ_sol = ɛ[sc]
-        else
-            function fg!(x, fx, gx)
-                ɛ[sc] = x
-                σ_res, ATS, _ = stress(ɛ, dt, mp, ms)
-                copy!(fx, σ_res[sc] - σ[sc])
-                copy!(gx, ATS[sc,sc])
+            function f(∆ε_red)
+                dε = zeros(6)
+                dε[sc] = ∆ε_red
+                σ_res, ms_new = stress(ɛ + dε, dt, mp, ms)
+                σ_res[sc] - σ[sc]
             end
 
-            res = nlsolve(only_fg!(fg!), ɛ_sol; xtol=xtol, ftol=ftol, iterations=iterations,
+            function g(∆ε_red)
+                dε = zeros(6)
+                dε[sc] = ∆ε_red
+                grad = ats(ɛ + dε, dt, mp, ms_new)
+                grad[sc, sc]
+            end
+
+            res = nlsolve(not_in_place(f, g), ∆ε₀; xtol=xtol, ftol=ftol, iterations=iterations,
                                                 method=method)
             if !converged(res)
                 if err_on_nonconv
@@ -64,15 +74,17 @@ function driver(matstat::MatStatus,
                     warn(NON_CONV_MESSAGE)
                 end
             end
-            ɛ_sol = res.zero
+            copy!(∆ε, res.zero)
         end
 
-        ɛ[sc] = ɛ_sol
+        copy!(∆εₙ₋₁, ∆ε)
+
+        ɛ[sc] += ∆ε
 
         # Update σ and material status at converged point
-        σ, ATS, ms = stress(ɛ, dt, mp, ms)
-
+        σ, ms = stress(ɛ, dt, mp, ms)
         push!(matstats, ms)
+
         σs[:, i] = σ
         εs[:, i] = ɛ
 
