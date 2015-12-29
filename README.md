@@ -24,34 +24,40 @@ the constitutive driver.
 
 In order to define a new material, the following needs to be implemented:
 
-* A material parameter type `<: MatParameter`. This type should contain material parameters
+* A material parameter type. This type should contain material parameters
 that are constant throughout the time steps. Typical parameters are elastic modulus
 and Poisson's ratio. Algorithmic parameters should also go in this type, for example
 the tolerances of a nonlinear solver in the material.
 
-* A material status type ` <: MatStatus`. This should contain quantities
+* A material status type. This should contain quantities
 that needs to be saved from the previous time step. Typical quantities to store is the amount of
 plastic strain and hardening. The result of running the simulation will contain a vector of the material status in each time step so anything that wants to be analyzed after the simulation should go here.
 
 * A function stress with the specification
 ```julia
 stress(ɛ::Vector, ∆t::Number, ms::MatStatus, mp::MatParameter)
-    -> σ::Vector, ATS::Matrix, ms::MatStatus
+    -> σ::Vector, ms::MatStatus
 ```
 where `ε` is the strain for the current time step, `∆t` is the time increment from the last time step, `ms` is the `MatStatus` from the previous timestep and `mp` is the `MatParameter` for the material.
 
-The function should return `σ, ATS, ms` where `σ` is the new stress, `ATS` is the
-Algorithmic Tangent Stiffness (or an approximation of it), and `ms` is the updated `MatStatus`.
+The function should return `σ, ms` where `σ` is the new stress and `ms` is the updated `MatStatus`.
 
-**Note**: You will need to import `stress` from `ConstLab.jl`so that your newly defined `stress` extends the one in `ConstLab.jl`.
+* If you want to use stress driven you should define a function
+```julia
+stiffness(ɛ::Vector, ∆t::Number, ms::MatStatus, mp::MatParameter)
+    -> E::Matrix
+```
+where `E` is the algorithmic tangent stiffness.
 
 ### Constitutive Driver
 
 The `driver` function takes material and load data, runs the analysis. Its specification is
 
 ```julia
-driver(matstat::MatStatus,
-       matpar::MatParameter,
+driver(stress::Function
+       stiffness::Function,
+       matstat,
+       matpar,
        time_history::Vector,
        ε_history::Matrix,
        σ_history::Matrix,
@@ -60,6 +66,10 @@ driver(matstat::MatStatus,
 ```
 
 Function arguments:
+
+* `stress`: function that computes stress and new matstatus as specified above
+
+* `stiffness`: function that computes the algorithmic tangent stiffness, only used when at least one component is stress driven.
 
 * `matstat`: the initial material status of the material.
 
@@ -130,7 +140,7 @@ Allowed `case`'s (`11, 22, 33, 23, 13, 12`- Voigt notation assumed):
 There are a few different examples in the `examples` directory. Note that some of the examples use more
 packages than what is needed to run `ConstLab.jl`. For example, some material models in the examples use
 the [ForwardDiff.jl](https://github.com/JuliaDiff/ForwardDiff.jl) package to compute Jacobians
-to the residuals of the non linear equilibrium equations.
+to the residuals of the non linear equilibrium equations and [Voigt.jl](https://github.com/KristofferC/Voigt.jl) for simple Voigt operations.
 
 ## Author
 

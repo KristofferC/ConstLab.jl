@@ -14,7 +14,8 @@ function driver(stress,
                 xtol::Real = 0.0,
                 ftol::Real = 1e-5,
                 iterations::Integer = 100,
-                method::Symbol = :trust_region)
+                method::Symbol = :trust_region,
+                show_trace::Bool = false)
 
     ɛ_dim, nɛ = size(strain_history)
     σ_dim, nσ = size(stress_history)
@@ -64,9 +65,8 @@ function driver(stress,
                 grad = ats(ɛ + dε, dt, mp, ms_new)
                 grad[sc, sc]
             end
-
             res = nlsolve(not_in_place(f, g), ∆ε₀; xtol=xtol, ftol=ftol, iterations=iterations,
-                                                method=method, show_trace=true)
+                          method=method, show_trace=show_trace)
             if !converged(res)
                 if err_on_nonconv
                     throw(NonConvergenceError())
