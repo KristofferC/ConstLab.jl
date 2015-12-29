@@ -52,21 +52,21 @@ function driver(stress,
             copy!(∆ε₀, ∆εₙ₋₁)
 
             function f(∆ε_red)
-                dε = zeros(6)
+                dε = zeros(ɛ_dim)
                 dε[sc] = ∆ε_red
                 σ_res, ms_new = stress(ɛ + dε, dt, mp, ms)
                 σ_res[sc] - σ[sc]
             end
 
             function g(∆ε_red)
-                dε = zeros(6)
+                dε = zeros(ɛ_dim)
                 dε[sc] = ∆ε_red
                 grad = ats(ɛ + dε, dt, mp, ms_new)
                 grad[sc, sc]
             end
 
             res = nlsolve(not_in_place(f, g), ∆ε₀; xtol=xtol, ftol=ftol, iterations=iterations,
-                                                method=method)
+                                                method=method, show_trace=true)
             if !converged(res)
                 if err_on_nonconv
                     throw(NonConvergenceError())

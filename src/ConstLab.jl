@@ -4,7 +4,7 @@ import Base.show
 
 using NLsolve
 
-export loadcase, driver, MatStatus, MatParameter, create_component_macro
+export loadcase, driver, MatStatus, MatParameter, create_component_macros
 
 const NON_CONV_MESSAGE = "constitutive iterations did not converge"
 
