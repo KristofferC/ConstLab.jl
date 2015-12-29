@@ -7,9 +7,10 @@ using Devectorize
 using Voigt
 using Voigt.Unicode
 
-import ConstLab.stress
+const II = veye(6) ⊗ veye(6)
+const Idev = eye(6,6) - 1/3 * II
 
-@with_kw immutable CrystPlastMS  <: MatStatus
+@with_kw immutable CrystPlastMS
     n_ε_p::Vector{Float64}
     # One per slip system:
     n_κ::Vector{Float64}
@@ -26,8 +27,9 @@ function CrystPlastMS(nslip)
 end
 
 
-@with_kw immutable CrystPlastMP  <: MatParameter
+@with_kw immutable CrystPlastMP
     E::Float64
+    Ee::Matrix{Float64}
     ν::Float64
     σy::Float64
     n::Float64
@@ -51,60 +53,45 @@ function CrystPlastMP(E, ν, σy, n, H, q, D, tstar, angles)
         sxm = voigtsym(s * m')
         push!(sxm_sym, sxm)
     end
-    CrystPlastMP(E, ν, σy, n, H, q, D, tstar, angles, sxm_sym, nslip)
+    G = E / 2(1 + ν);
+    K = E / 3(1 - 2ν);
+    Ee = 2 * G * Idev+ K * II;
+    Ee[4:6, 4:6] /= 2.0;
+    Ee
+    CrystPlastMP(E, Ee, ν, σy, n, H, q, D, tstar, angles, sxm_sym, nslip)
 end
 
-const II = veye(6) ⊗ veye(6)
-const Idev6 = eye(6,6) - 1/3 * II
-
 function stress(ε, dt, matpar::CrystPlastMP, matstat::CrystPlastMS)
-
     @unpack matstat: n_ε_p, n_κ, n_τ, n_μ
-    @unpack matpar: E, ν, σy, sxm_sym, nslip
+    @unpack matpar: Ee, ν, σy, sxm_sym, nslip
 
-    G = E / 2(1 + ν)
-    K = E / 3(1 - 2ν)
-    Ee = 2 * G * Idev6 + K * II
-    Ee[4:6, 4:6] /= 2.0
     σ_tr = Ee * (ε - n_ε_p)
 
-    function res_wrapper(x)
-        σ = x[1:6]
-        κ = x[7:7+nslip-1]
-        μ = x[7+nslip:end]
-        R_σ, R_κ, R_Φ = compute_residual(σ, κ, μ, σ_tr, dt, matpar, matstat)
-        [R_σ; R_κ; R_Φ]
-    end
-
     x0 = [σ_tr; n_κ; n_μ]
-
-    jac = jacobian(res_wrapper)
-    res = nlsolve(not_in_place(res_wrapper, jac), x0; iterations = 30, store_trace = true, ftol = 1e-6)
-
+    
+    R!(x, fx) = compute_residual!(fx, x, σ_tr, dt, matpar, matstat)
+    res = nlsolve(R!, x0; iterations = 30, ftol = 1e-4, autodiff = true)
     if !NLsolve.converged(res)
         error("No convergence in material routine")
     end
-
-    X = res.zero
-    σ_X = X[1:6]
-    κ_X = X[7:7+nslip-1]
-    μ_X = X[7+nslip:end]
+    X = res.zero::Vector{Float64}
+    ConstLab.@unpack_cp (σ, κ, μ) = X
     ε_p = copy(n_ε_p)
-    τ_X = zeros(eltype(σ_X), nslip)
+    τ = zeros(nslip)
     for α = 1:nslip
-        τ_X[α] = σ_X : sxm_sym[α]
-        ε_p += μ_X[α] * sxm_sym[α] * sign(n_τ[α])
+        τ[α] = σ : sxm_sym[α]
+        ε_p += μ[α] * sxm_sym[α] * sign(n_τ[α])
     end
 
-    ms = CrystPlastMS(ε_p, κ_X, τ_X, μ_X)
-    return σ_X, zeros(6,6), ms
+    return σ, CrystPlastMS(ε_p, κ, τ, μ)
 end
 
 
-function compute_residual(σ, κ, μ, σ_tr, dt, matpar, matstat)
-
-    @unpack_CrystPlastMP matpar
-    @unpack_CrystPlastMS matstat
+function compute_residual!(fx, x, σ_tr, dt, matpar, matstat)
+    @unpack matstat: n_ε_p, n_κ, n_τ, n_μ
+    @unpack matpar: Ee, ν, σy, sxm_sym, nslip, H, q, tstar, D, n
+    
+    ConstLab.@unpack_cp (σ, κ, μ) = x
 
     R_Φ = zeros(eltype(σ), nslip)
     R_κ = zeros(eltype(σ), nslip)
@@ -126,11 +113,9 @@ function compute_residual(σ, κ, μ, σ_tr, dt, matpar, matstat)
     for α = 1:nslip
         ep += μ[α] .* sxm_sym[α] .* sign(τ[α])
     end
-    G = E / 2(1 + ν)
-    K = E / 3(1 - 2ν)
-    Ee = 2 * G * Idev6 + K * II
 
     R_σ += Ee * ep
-
-    return R_σ, R_κ, R_Φ
+    
+    ConstLab.@pack_cp fx = (R_σ, R_κ, R_Φ)
+    return
 end
