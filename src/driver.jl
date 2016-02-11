@@ -9,8 +9,6 @@ function driver(stress,
                 strain_history::Matrix,
                 stress_history::Matrix,
                 strain_control::Vector{Bool};
-                err_on_nonconv::Bool = true,
-                warn_on_nonconv::Bool = true,
                 xtol::Real = 0.0,
                 ftol::Real = 1e-5,
                 iterations::Integer = 100,
@@ -31,8 +29,8 @@ function driver(stress,
     sc = !strain_control
 
     matstats = [ms]
-    εs = zeros(ɛ_dim, nt)
-    σs = zeros(ɛ_dim, nt)
+    εs = strain_history[:,1]
+    σs = stress_history[:,1]
     ɛ_sol = zeros(sum(sc))
     ms_grad = deepcopy(ms)
 
@@ -42,12 +40,12 @@ function driver(stress,
     ∆εₙ₋₁ = zeros(sum(sc))
     ∆ε₀ = zeros(sum(sc))
     ∆ε = zeros(sum(sc))
-    for (i, t) in enumerate(time_history[2:end])
+    for t in time_history[2:end]
         i += 1
         dt = t - t_prev
+        # Guess total strain
         ɛ = strain_history[:, i]
         σ = stress_history[:, i]
-        # Guess total strain
         ms_new = deepcopy(ms)
         if !(sum(sc) == 0)
             copy!(∆ε₀, ∆εₙ₋₁)
@@ -65,16 +63,21 @@ function driver(stress,
                 grad = ats(ɛ + dε, dt, mp, ms_new)
                 grad[sc, sc]
             end
-            res = nlsolve(not_in_place(f, g), ∆ε₀; xtol=xtol, ftol=ftol, iterations=iterations,
-                          method=method, show_trace=show_trace)
-            if !converged(res)
-                if err_on_nonconv
-                    throw(NonConvergenceError())
-                elseif warn_on_nonconv
+            try
+                res = nlsolve(not_in_place(f, g), ∆ε₀; xtol=xtol, ftol=ftol,
+                              iterations=iterations, method=method, show_trace=show_trace)
+                if !converged(res)
+                    i -= 1
                     warn(NON_CONV_MESSAGE)
+                    @goto ret
                 end
+                copy!(∆ε, res.zero)
+            catch e
+                isa(e, MaterialNonConvergenceError) || rethrow(e)
+                i -= 1
+                warn(MAT_NON_CONV_MESSAGE)
+                @goto ret
             end
-            copy!(∆ε, res.zero)
         end
 
         copy!(∆εₙ₋₁, ∆ε)
@@ -82,14 +85,24 @@ function driver(stress,
         ɛ[sc] += ∆ε
 
         # Update σ and material status at converged point
-        σ, ms = stress(ɛ, dt, mp, ms)
-        push!(matstats, ms)
-
-        σs[:, i] = σ
-        εs[:, i] = ɛ
+        try
+            σ, ms = stress(ɛ, dt, mp, ms)
+            push!(matstats, ms)
+            append!(σs, σ)
+            append!(εs, ɛ)
+        catch e
+            println(e)
+            isa(e, MaterialNonConvergenceError) || rethrow(e)
+            i -= 1
+            warn(MAT_NON_CONV_MESSAGE)
+            @goto ret
+        end
 
         t_prev = t
     end # time
 
-    return εs, σs, matstats
+    @label ret
+    ɛs_mat = reshape(εs, (ɛ_dim, i))
+    σs_mat = reshape(σs, (σ_dim, i))
+    return ɛs_mat, σs_mat, matstats
 end
